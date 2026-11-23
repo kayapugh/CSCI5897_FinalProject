@@ -12,7 +12,7 @@ from epydemix import load_predefined_model
 from epydemix.utils import convert_to_2Darray, compute_simulation_dates
 from epydemix.population import load_epydemix_population
 
-population = load_epydemix_population(population_name="Japan")
+# population = load_epydemix_population(population_name="South_Korea") # Could eventually use for age stratification, haven't tried it out yet
 
 #### Paper's parameters 
 """
@@ -28,6 +28,7 @@ N = 4,000 (2,000 per group)
 """
 
 # !!! Missing non-trial compartments
+# -- Model definition --
 model = EpiModel(
     name="SEIR Model",
     compartments=["Sp","Ep", "Ip", "Ap","PI","R", # Placebo arm
@@ -42,7 +43,9 @@ model = EpiModel(
                 }
 )
 
-# Add transitions: Placebo arm
+# -- transition rules ---
+
+# Placebo arm
 # Transmissions: Infectious compartments
 model.add_transition(source="Sp", target="Ep", params=("beta", "Ip"), kind="mediated") 
 model.add_transition(source="Sp", target="Ep", params=("beta", "Ivf"), kind="mediated") 
@@ -113,11 +116,9 @@ df_quantiles = results.get_quantiles_compartments()
 plot_quantiles(df_quantiles, columns=[ "Sp_total", "Ep_total", "Ip_total","R_total"])
 plot_quantiles(df_quantiles, columns=[ "Ip_total", "Ivf_total", "Iv_total"])
 
-
-
+# -- Calculating VE estimate --
 dfq = df_quantiles
 finals = dfq[(dfq['date'] == "2024-09-10 00:00:00") & (dfq['quantile'] == 0.5)]
 
 VEhat = 1 - finals['VI_total']/finals['PI_total']
 print(VEhat)
-#2024-09-10 00:00:00
