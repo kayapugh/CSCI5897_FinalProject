@@ -26,8 +26,8 @@ import numpy as np
 #### Paper's parameters 
 """
 R = 1.46
-Incubation period = 1.5 days
-Infectious period = 3 days
+Incubation period = 1.5 days (1/sigma)
+Infectious period = 3 days (1/gamma)
 Asx prop: 50% [35%, 65%]
 Asx reduction ratio: 50% [35%, 65%]
 
@@ -41,13 +41,13 @@ Trial:
 """
 
 model = EpiModel(
-    name="SEIR Model",
+    name="RCT AoN Model",
     compartments=["S", "E", "I", "A", "R", # general population
                   "Sp","Ep", "Ip", "PI", # Placebo arm
                   "Svf", "Evf", "Ivf", "VI",  # Vaccine arm: failure 
                   "V", "Sv", "Ev", "Iv"  # Vaccine arm: success
                   ],
-    parameters={"beta": 0.486,
+    parameters={"beta": 0.486,  # divide by four because that's my current janky solution
                 "beta_a": 0.486*0.5,
                 "gamma": 0.333,
                 "sigma": 0.666,
@@ -56,13 +56,12 @@ model = EpiModel(
                 }
 )
 
-# Including epydemix's age strat and contact matrix for South Korea. As is it has
-# less compartments than the og paper and the contact matrix maybe looks a little 
-# different, but I figure we can decide if that really matters later.
-# Right now it doesn't really do anyhting bc I haven't set up age dependent transmission
-population = load_epydemix_population(population_name="South_Korea")
-model.set_population(population)
+## Not currently implementing age stratification, so this isn't really doing anything 
+# epydemix's age strat and contact matrix for South Korea. As is it has less compartments than the og paper and the contact matrix maybe looks a little different, but I figure we can decide if that really matters later.
+pop = load_epydemix_population(population_name="South_Korea")
+model.set_population(pop)
 
+## Set up recruitment rate parameter: mean 3.5 days for the first 4 weeks, then 0
 start = "2024-01-01"
 end = "2024-03-01"
 timeperiod = compute_simulation_dates(start_date=start, end_date=end)
@@ -79,13 +78,12 @@ model.add_parameter(parameter_name="recruitment_rate", value = recruitment)
 model.add_transition(source="S", target="Sp", params="1/2*recruitment_rate", kind="spontaneous")
 model.add_transition(source="S", target="Svf", params="1/2*(1-VE)*recruitment_rate", kind="spontaneous")
 model.add_transition(source="S", target="V", params="1/2*VE*recruitment_rate", kind="spontaneous")
-
 # Transmissions: Infectious compartments
 model.add_transition(source="S", target="E", params=("beta", "I"), kind="mediated") 
 model.add_transition(source="S", target="E", params=("beta", "Ip"), kind="mediated") 
 model.add_transition(source="S", target="E", params=("beta", "Ivf"), kind="mediated") 
 model.add_transition(source="S", target="E", params=("beta", "Iv"), kind="mediated") 
-# Transmissions: Asymptomatic compartments
+# Transmissions: Asymptomatic compartment
 model.add_transition(source="S", target="E", params=("beta_a", "A"), kind="mediated")
 # Latent transitions
 model.add_transition(source="E", target="I", params="sigma", kind="spontaneous")
@@ -140,13 +138,12 @@ model.add_transition(source="Ev", target="A", params="sigma", kind="spontaneous"
 model.add_transition(source="Iv", target="VI", params="gamma", kind="spontaneous")
 
 
-
-N = 51738086  ## make sure this matches
-
+### Initial conditions:
+N = model.population.Nk
 s0 = 0.9999
 i0 = 0.0001
 
-# Run simulations
+## Run simulations
 results = model.run_simulations(
     initial_conditions_dict={"S": s0*N, "I": i0*N},
     start_date= start,
@@ -157,10 +154,12 @@ results = model.run_simulations(
 # Extract and plot quantiles of compartment counts
 df_quantiles = results.get_quantiles_compartments()
 plot_quantiles(df_quantiles, columns=[ "S_total", "E_total", "I_total","R_total"]) # Plot just gen pop
-plot_quantiles(df_quantiles, columns=[ "Ip_total", "Ivf_total", "Iv_total"]) # Plot tial infection compartments
+plot_quantiles(df_quantiles, columns=[ "Ip_total", "Ivf_total", "Iv_total"]) # Plot trial infection compartments
 
+## Compute VE estimate
 dfq = df_quantiles
-finals = dfq[(dfq['date'] == end + "00:00:00") & (dfq['quantile'] == 0.5)]
+finals = dfq[(dfq['date'] == end + " 00:00:00") & (dfq['quantile'] == 0.5)] # Median cumulative compartment count at final time
 
-VEhat = 1 - finals['VI_total']/finals['PI_total']
-print(VEhat)
+VEhat = 1 - finals['VI_total']/finals['PI_total'] # 1 - (vaccine arm infections)/(placebo arm infections)
+print("VE estimate: ", VEhat) 
+
