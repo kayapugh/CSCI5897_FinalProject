@@ -43,9 +43,8 @@ Trial:
 model = EpiModel(
     name="RCT AoN Model",
     compartments=["S", "E", "I", "A", "R", # general population
-                  "Sp","Ep", "Ip", "PI", # Placebo arm
-                  "Svf", "Evf", "Ivf", "VI",  # Vaccine arm: failure 
-                  "V", "Sv", "Ev", "Iv"  # Vaccine arm: success
+                  "Sp","Ep", "Ip", "PI", # Placebo arm 
+                  "V", "Sv", "Ev", "Iv", "VI"  # Vaccine arm: success
                   ],
     parameters={"beta": 0.486, 
                 "beta_a": 0.486*0.5,
