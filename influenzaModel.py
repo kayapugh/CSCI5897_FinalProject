@@ -47,7 +47,7 @@ model = EpiModel(
                   "Svf", "Evf", "Ivf", "VI",  # Vaccine arm: failure 
                   "V", "Sv", "Ev", "Iv"  # Vaccine arm: success
                   ],
-    parameters={"beta": 0.486,  # divide by four because that's my current janky solution
+    parameters={"beta": 0.486,
                 "beta_a": 0.486*0.5,
                 "gamma": 0.333,
                 "sigma": 0.666,
